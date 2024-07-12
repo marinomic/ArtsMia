@@ -18,6 +18,8 @@ class View(ft.UserControl):
         self._btnCompConnessa = None
         self._txtIdOggetto = None
         self._txt_result = None
+        self._ddLunghezza = None
+        self._btnCercaOggetti = None
 
     def load_interface(self):
         # title
@@ -32,14 +34,37 @@ class View(ft.UserControl):
                                                      bgcolor="orange",
                                                      color="black",
                                                      width=200)
-        self._txtIdOggetto = ft.TextField(label="Id Oggetto", color="orange", border_color="orange")
+        self._txtIdOggetto = ft.TextField(label="Id Oggetto",
+                                          color="orange",
+                                          border_color="orange",
+                                          width=200)
         self._btnCompConnessa = ft.ElevatedButton(text="Cerca Connessa", on_click=self._controller.handleCompConnessa,
                                                   bgcolor="orange",
                                                   color="black",
                                                   width=200)
+        self._ddLunghezza = ft.Dropdown(label="Lunghezza",
+                                        color="orange",
+                                        border_color="orange",
+                                        width=200,
+                                        disabled=True)
+        self._btnCercaOggetti = ft.ElevatedButton(text="Cerca oggetti",
+                                                  on_click=self._controller.handleCercaOggetti,
+                                                  bgcolor="orange",
+                                                  color="black",
+                                                  width=200,
+                                                  disabled=True)
 
-        self._page.controls.append(ft.Row([self._btnAnalizzaOggetti, self._txtIdOggetto, self._btnCompConnessa],
-                                          alignment=ft.MainAxisAlignment.CENTER))
+        self._page.controls.append(ft.Row([
+            ft.Container(self._btnAnalizzaOggetti, width=250),
+            ft.Container(self._txtIdOggetto, width=250),
+            ft.Container(self._btnCompConnessa, width=250)],
+            alignment=ft.MainAxisAlignment.CENTER))
+        self._page.controls.append(
+            ft.Row([
+                ft.Container(None, width=250),
+                ft.Container(self._ddLunghezza, width=250),
+                ft.Container(self._btnCercaOggetti, width=250)],
+                alignment=ft.MainAxisAlignment.CENTER))
 
         # List View where the reply is printed
         self._txt_result = ft.ListView(expand=1, spacing=10, padding=20, auto_scroll=True)

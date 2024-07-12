@@ -1,3 +1,5 @@
+import copy
+
 import networkx as nx
 
 from database.DAO import DAO
@@ -9,12 +11,14 @@ class Model:
         self._artObjectList = DAO().getAllObjects()
         self._grafo.add_nodes_from(self._artObjectList)
         self._idMap = {obj.object_id: obj for obj in self._artObjectList}
+        self._solBest = []
+        self._costBest = 0
 
     def buildGraph(self):
         self.addEdges()
 
     def addEdges(self):
-        # self._grafo.edges.clear()
+        self._grafo.clear_edges()
         # Soluzione 1: Ciclare sui nodi, conviene quando ho pochi nodi (in questo caso la tabella objects sul db conta 8500 righe)
         # for u in self._artObjectList:
         #     for v in self._artObjectList:
@@ -34,19 +38,19 @@ class Model:
     def checkExistence(self, idOggetto):
         return idOggetto in self._idMap
 
-# Per calcolare la componente connessa conviene usare DFS e siccome ci interessano i numeri di vertici che la compongono
-# come richiesto nella traccia, non conviene utilizzare dfs_edges perchè restituisce solo gli archi del grafo. Proviamo
-# invece a utilizzare
-# 1) dfs_successors che restituisce un dizionario con i successori di ogni nodo visitato.
-# 2) dfs_predecessors che restituisce un dizionario con i predecessori di ogni nodo visitato.
-# 3) dfs_tree che restituisce un albero di copertura del grafo.
-# 4) node_connected_component che restituisce la componente connessa di un nodo.
-# Siccome il grafo non è orientato, prendere i successori o i predecessori è indifferente. L'unica differenza è che
-# dfs_successors restituisce un dizionario con come chiave un nodo e come valore una lista di tutti i suoi successori
-# (vedi debug per capire meglio) mentre dfs_predecessors ha come valore per ogni chiave il singolo nodo predecessore,
-# siccome il noto in chiave sarà stato raggiunto da un solo altro nodo.
-# Facendo il testModel e debuggando len(successors.values) e len(predecessors.values) si nota quindi che il numero
-# risultante è minore per i predecessori rispetto ai successori(perchè gli elementi values di successori sono liste di nodi).
+    # Per calcolare la componente connessa conviene usare DFS e siccome ci interessano i numeri di vertici che la compongono
+    # come richiesto nella traccia, non conviene utilizzare dfs_edges perchè restituisce solo gli archi del grafo. Proviamo
+    # invece a utilizzare
+    # 1) dfs_successors che restituisce un dizionario con i successori di ogni nodo visitato.
+    # 2) dfs_predecessors che restituisce un dizionario con i predecessori di ogni nodo visitato.
+    # 3) dfs_tree che restituisce un albero di copertura del grafo.
+    # 4) node_connected_component che restituisce la componente connessa di un nodo.
+    # Siccome il grafo non è orientato, prendere i successori o i predecessori è indifferente. L'unica differenza è che
+    # dfs_successors restituisce un dizionario con come chiave un nodo e come valore una lista di tutti i suoi successori
+    # (vedi debug per capire meglio) mentre dfs_predecessors ha come valore per ogni chiave il singolo nodo predecessore,
+    # siccome il noto in chiave sarà stato raggiunto da un solo altro nodo.
+    # Facendo il testModel e debuggando len(successors.values) e len(predecessors.values) si nota quindi che il numero
+    # risultante è minore per i predecessori rispetto ai successori(perchè gli elementi values di successori sono liste di nodi).
     def getCompConnessa(self, idOggetto):
         # return nx.node_connected_component(self._grafo, self._idMap[idOggetto])
         #  Metodo 1) dfs_successors
@@ -64,12 +68,55 @@ class Model:
         print(f"Metodo 2 (pred): {len(predecessors.values())}")
 
         # Metodo 3) dfs_tree
-        tree = nx.dfs_tree(self._grafo, v0)  # restituisce un albero di copertura del grafo, contiene anche il nodo source, q
+        tree = nx.dfs_tree(self._grafo,
+                           v0)  # restituisce un albero di copertura del grafo, contiene anche il nodo source, q
         # quindi risulterà avere un nodo in più rispetto ai precedenti metodi
         print(f"Metodo 3 (tree): {len(tree.nodes)}")
 
         # Metodo 4) node_connected_component
-        compCon = nx.node_connected_component(self._grafo, v0)  # restituisce un set di nodi, anche questo contiene il nodo source
+        compCon = nx.node_connected_component(self._grafo,
+                                              v0)  # restituisce un set di nodi, anche questo contiene il nodo source
         print(f"Metodo 4 (node_connected_component): {len(compCon)}")
 
         return len(compCon)  # restituisco il numero di nodi della componente connessa, come richiesto nella traccia
+
+    def getBestPath(self, lunghezza, source):
+        """
+        Il programma dovrà cercare il cammino di peso massimo, avente lunghezza pari a lunghezza, il cui vertice iniziale coincida
+        con il vertice selezionato idOggetto, che comprenda esclusivamente vertici che abbiano tutti la stessa classification.
+        """
+        self._solBest = []
+        self._costBest = 0
+        parziale = [source]
+        for v in self._grafo.neighbors(source):
+            parziale.append(v)
+            self.ricorsiva(parziale, lunghezza)
+            parziale.pop()
+        return self._costBest, self._solBest
+
+    def ricorsiva(self, parziale, lunghezza):
+        # caso terminale, controllo se parziale è una soluzione valida e se è migliore del best trovato finora
+        if len(parziale) == lunghezza:
+            peso = self.calcolaPeso(parziale)
+            if peso > self._costBest:
+                self._costBest = peso
+                self._solBest = copy.deepcopy(parziale)
+            return
+        # caso ricorsivo, se arrivo qui allora len(parziale) < lunghezza
+        ultimo = parziale[-1]
+        for vicino in self._grafo.neighbors(ultimo):
+            # vincolo: vicino lo aggiungo solo se ha la stessa classification dell'ultimo nodo inserito in parziale
+            if vicino.classification == ultimo.classification and vicino not in parziale:
+                parziale.append(vicino)
+                self.ricorsiva(parziale, lunghezza)
+                parziale.pop()
+
+    def calcolaPeso(self, listObj):
+        peso = 0
+        # per calcolare il peso del cammino, sommo i pesi degli archi che collegano i nodi del cammino
+        for i in range(0, len(listObj) - 1):
+            peso += self._grafo[listObj[i]][listObj[i + 1]]['weight']
+        return peso
+
+    def getObjFromId(self, idOggetto):
+        return self._idMap[idOggetto]
